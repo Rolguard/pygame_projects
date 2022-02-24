@@ -18,13 +18,10 @@ player_rect = pygame.Rect(50, 50, player_model.get_width(), player_model.get_hei
 
 moving_left = False
 moving_right = False
-moving_up = False
 moving_down = False
 
 player_y_velocity = 0
 air_timer = 0
-
-# Currently issue where the tiles are not being displayed
 
 game_map = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -125,7 +122,6 @@ while True:
     if moving_left:
         player_movement[0] -= 2
 
-
     # Enables gravity for the player
     player_movement[1] += player_y_velocity
     # Player moves 4.5 pixels in 5 frames
@@ -170,9 +166,6 @@ while True:
 
             if event.key == K_RIGHT:
                 moving_right = False
-
-            if event.key == K_UP:
-                moving_up = False
 
         if event.type == QUIT:
             pygame.quit()

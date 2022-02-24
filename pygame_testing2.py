@@ -12,7 +12,7 @@ pygame.display.set_caption("Pygame Tester")
 
 game_icon = pygame.image.load("pygame_images/grass_tile1.png")
 pygame.display.set_icon(game_icon)
-player_model = pygame.image.load("pygame_images/knight_24x24.png")
+player_model = pygame.image.load("pygame_images/knight_23x22.png")
 grass_img = pygame.image.load("pygame_images/grass_tile_24x24.png")
 dirt_img = pygame.image.load("pygame_images/dirt_tile_24x24.png")
 

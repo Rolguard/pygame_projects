@@ -1,0 +1,6 @@
+Feature to be added:
+1. More key sensitive jumping
+- If the player just lightly taps the up arrow, the player_rect should only move slightly
+- If the player holds the up arrow, the player_rect's y velocity should increase until a certain point
+
+
