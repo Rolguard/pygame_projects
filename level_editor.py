@@ -16,6 +16,10 @@ window_height = 864
 side_margin = 320
 bottom_margin = 80
 
+# Create two separate resolutions so that the level editor works for monitors with lower resolution
+# Using a lower resolution doesn't mean just changing the size of the screen
+# All images pre-loaded with a certain scale need to be readjusted in size
+
 screen = pygame.display.set_mode((window_width + side_margin, window_height + bottom_margin))
 pygame.display.set_caption("Level Editor")
 
@@ -26,7 +30,7 @@ scroll = 0
 scroll_speed = 1
 
 rows = 18
-max_cols = 160
+max_cols = 140
 # Want tile size to be 48 to match game
 tile_size = window_height // rows
 tile_types = 38
@@ -49,7 +53,6 @@ for row in range(rows):
 for col in range(max_cols):
     level_data[rows - 2][col] = 1
     level_data[rows - 1][col] = 10
-print(level_data)
 
 
 # Loads an image from the given path
@@ -63,7 +66,7 @@ def load_image(path, scale, alpha):
     return img
 
 
-# Load images
+# Load images, bg = 384x216
 bg1 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-1.png", scale, True)
 bg2 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-2.png", scale, True)
 bg3 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-3.png", scale, True)
@@ -72,19 +75,23 @@ bg5 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-
 
 img_list = []
 for i in range(tile_types):
-    img = pygame.image.load(f"pygame_images/game1/tiles/{i}.png")
+    img = pygame.image.load(f"pygame_images/game1/tiles/{i}.png").convert_alpha()
     img = pygame.transform.scale(img, (tile_size, tile_size))
     img_list.append(img)
 print(len(img_list))
+
+# Create special buttons
+restart_btn = button.Button(324, window_height + 40, img_list[35], 1)
+load_btn = button.Button(324 * 2, window_height + 40, img_list[36], 1)
+save_btn = button.Button(324 * 3, window_height + 40, img_list[37], 1)
 
 # Make a button list
 button_list = []
 btn_col = 0
 btn_row = 0
 
-
-# TODO: Make refresh, load and save buttons appear on bottom margin of level editor
-for i in range(len(img_list)):
+# Ignores last 3 tiles
+for i in range(len(img_list) - 3):
     btn = button.Button(window_width + (btn_col * 70) + 50, btn_row * 70 + 50, img_list[i], 1)
     button_list.append(btn)
     btn_col += 1
@@ -110,7 +117,7 @@ def draw_bg():
 def draw_grid():
     # Draw vertical lines up to the maximum columns
     for i in range(max_cols + 1):
-        pygame.draw.line(screen, white, (i * tile_size, 0), (i * tile_size, window_height))
+        pygame.draw.line(screen, white, (i * tile_size - scroll, 0), (i * tile_size - scroll, window_height))
 
     # Draw horizontal lines up to the rows
     for i in range(rows + 1):
@@ -122,7 +129,7 @@ def draw_level():
     for y, row, in enumerate(level_data):
         for x, tile in enumerate(row):
             if tile != -1:
-                screen.blit(img_list[tile], (x * tile_size - scroll, y * tile_size))
+                screen.blit(img_list[tile], ((x * tile_size - scroll), y * tile_size))
 
 
 running = True
@@ -135,23 +142,27 @@ while running:
     # Draw tile panel and tiles
     pygame.draw.rect(screen, green, (window_width, 0, side_margin, window_height))
 
+    if restart_btn.draw(screen):
+        print("Clicking restart button")
+    elif load_btn.draw(screen):
+        print("Clicking load button")
+    elif save_btn.draw(screen):
+        print("Clicking save button")
+
     # Button count is incremented with enumerate and used to distinguish buttons from each other
-    button_count = 0
-    for button_count, i in enumerate(button_list):
-        if i.draw(screen):
-            # Button class draw method returns a bool that shows whether it has been clicked
+    for button_count, btn in enumerate(button_list):
+        if btn.draw(screen):
             selected_tile = button_count
 
     pygame.draw.rect(screen, red, (button_list[selected_tile].rect.x, button_list[selected_tile].rect.y,
                                    button_list[selected_tile].rect.size[0], button_list[selected_tile].rect.size[1]), 3)
-
     # Add new tiles to screen
     pos = pygame.mouse.get_pos()
     level_x = (pos[0] + scroll) // tile_size
     level_y = pos[1] // tile_size
 
     # Check mouse coordinates are within level grid
-    if pos[0] < window_width or pos[1] < window_height:
+    if pos[0] < window_width and pos[1] < window_height:
         # Update tile value
         if pygame.mouse.get_pressed()[0]:
             level_data[level_y][level_x] = selected_tile
@@ -159,16 +170,13 @@ while running:
         elif pygame.mouse.get_pressed()[2]:
             level_data[level_y][level_x] = -1
 
-    print((level_x, level_y))
-
-
     # Scroll the map
     if scroll_left and scroll > 0:
-        scroll -= 5 * scroll_speed
+        scroll -= 6 * scroll_speed
 
-    if scroll_right:
+    if scroll_right and scroll < max_cols * tile_size - window_width:
         # As scroll increases, background images move to the left, simulating camera movement to the right
-        scroll += 5 * scroll_speed
+        scroll += 6 * scroll_speed
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
