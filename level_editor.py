@@ -1,5 +1,6 @@
 import pygame
 import button
+import csv
 
 pygame.init()
 
@@ -35,6 +36,7 @@ max_cols = 140
 tile_size = window_height // rows
 tile_types = 38
 selected_tile = 0
+level = 0
 
 # Define colours
 green = (144, 201, 120)
@@ -148,6 +150,7 @@ while running:
         print("Clicking load button")
     elif save_btn.draw(screen):
         print("Clicking save button")
+        # with open(f"level_{level}_data.csv", "w", newline=''):
 
     # Button count is incremented with enumerate and used to distinguish buttons from each other
     for button_count, btn in enumerate(button_list):
@@ -191,6 +194,8 @@ while running:
             # Change scrolling speed using lshift
             if event.key == pygame.K_LSHIFT:
                 scroll_speed = 4
+            if event.key == pygame.K_ESCAPE:
+                running = False
 
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_LEFT:

@@ -347,7 +347,7 @@ class Projectile(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         # Can adjust such that speed is an argument, so that there can be multiple projectiles with different speeds
 
-        self.velocity_x = 10
+        self.velocity_x = 8
         self.frame_index = 0
         self.update_time = pygame.time.get_ticks()
         self.frames = frames
@@ -381,6 +381,9 @@ class Projectile(pygame.sprite.Sprite):
                     explosion_group.add(explosion)
                     enemy.health -= 10
                     self.kill()
+            elif pygame.sprite.spritecollide(player, wraith_proj_group, False):
+                player.health -= 5
+                self.kill()
 
         self.update_animation()
         self.draw()
