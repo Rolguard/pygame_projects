@@ -6,9 +6,9 @@ class SpriteSheet:
         self.sheet = image
 
     # Returns a new surface specified by width and height that contains a section of the sprite sheet
-    def get_image(self, row, frame, width, height, scale, colour=False):
+    def get_image(self, row, frames, width, height, scale, colour=False):
         image = pygame.Surface((width, height)).convert_alpha()
-        image.blit(self.sheet, (0, 0), ((frame * width), (row * height), width, height))
+        image.blit(self.sheet, (0, 0), ((frames * width), (row * height), width, height))
         image = pygame.transform.scale(image, (width * scale, height * scale))
 
         if not colour:
