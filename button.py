@@ -5,11 +5,14 @@ import pygame
 # Can add outline to button when being hovered
 # Button clicks or any left or right click events
 
+# TODO: Implement text features for button class
+
 class Button:
-    def __init__(self, x, y, image, scale):
-        width = image.get_width()
-        height = image.get_height()
-        self.image = pygame.transform.scale(image, (int(width * scale), int(height * scale)))
+    def __init__(self, x, y, scale, image=None, text=None):
+        if image is not None:
+            width = image.get_width()
+            height = image.get_height()
+            self.image = pygame.transform.scale(image, (int(width * scale), int(height * scale)))
         self.clicked = False
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
@@ -29,5 +32,4 @@ class Button:
             self.clicked = False
 
         surface.blit(self.image, (self.rect.x, self.rect.y))
-
         return action

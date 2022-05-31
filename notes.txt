@@ -4,3 +4,60 @@ Feature to be added:
 - If the player holds the up arrow, the player_rect's y velocity should increase until a certain point
 
 
+Notes from debugging:
+1. Player was still moving in scrolling region, when the player is supposed to not move
+
+# player.move is called every tick of the game loop
+# If the player is in the region for scrolling, the self.rect.x change in movement should be cancelled from -=
+# But the pos_float still has the location of the player with the dx added on
+# So by the next tick of the game loop, rect.x is assigned to pos_float which was the location after movement
+# From the previous tick. This then simulates movement which was supposed to be stopped when in scrolling region\
+
+1. Pressing jump near an enemy firing a projectile will instantly kill you.
+2. Running into an enemy about to cast a projectile will instantly kill you.
+
+Landing on a projectile kills instantly?
+
+Triggering multiple wraith attacks might overdo damage
+
+My guess is that there are multiple enemies in enemy_group,
+If you cause multiple wraith projectiles to appear on screen
+(have not been killed by either hitting the player, any tile or the edge of the screen [might need to look at that])),
+then get hit by 1, you'll get dealt cumulative damage based on the number of enemies?
+
+For each enemy in enemy_group (contains several objects with the Character class [inherits pygame sprite class])
+you have 1 Character object.
+
+E.g. With 4 enemies in enemy_group, iterating through each enemy, we check if our fireball has hit
+that specific enemy. Then we also check if the player has collided with any wraith projectiles,
+if they have, then they take damage and the projectile is killed from the screen.
+This would be repeated 4 times in the example
+
+Solution: Take out collision check for wraith projectile and player outside of for loop.
+Not entirely sure why this works, technically, there shouldn't be any errors having in the loop
+since the wraith proj is killed after damage is dealt.
+This means they should only lose health once by a proj which is then removed, meaning
+the collision between the player and the wraith_proj_group should not be there anymore and thus take no more damage.
+
+
+Scroll successfully stops before reaching end of level when the scroll starting point is 300
+But fails when the scroll starting point = window_width // 2
+
+Fix should be related to world length and/or bg_scroll
+
+When moving the camera, the player's movement in the x direction (dx) is negated/cancelled.
+The camera is then moved. So technically, what happens is that after passing the scroll starting point,
+the player rect never actually moves, but all the tiles move in the opposite direction the player is going,
+simulating both player and camera movement.
+
+This leads to an issue where if the scroll starting point is set to a greater number than
+the player.rect.left, one of the conditions for camera movement becomes true.
+As a result, the camera will move beyond the length of the level where it should be stopped.
+
+SOLUTION:
+Fixed by accounting for the size of the player (1 tile or 48px) when moving the camera.
+Instead of setting camera movement based on if the player is directly left or right of the centre,
+the region is reduced to account for the player's size. This way the condition for checking if the player
+is in the scroll starting point will never occur if the player is directly in the centre of the screen.
+
+

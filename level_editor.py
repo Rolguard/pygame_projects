@@ -2,6 +2,8 @@ import pygame
 import button
 import csv
 import os
+import util
+import spritesheet
 
 pygame.init()
 
@@ -30,6 +32,10 @@ determination_font = pygame.font.Font("pygame_images/game1/fonts/DeterminationSa
 # new_button = ui_buttons.get_image(8, 4, 16, 16, 1)
 #
 # pygame.image.save(new_button, "pygame_images/game1/tiles/test_button.png")
+# spikes = spritesheet.SpriteSheet(pygame.image.load("pygame_images/game1/spikes/16-bit-spike-Sheet.png"))
+# spikes_list = spikes.get_image_list(0, 4, 16, 16, 1, True)
+# for idx, img in enumerate(spikes_list):
+#     pygame.image.save(img, f"pygame_images/game1/spikes/{idx}.png")
 
 # Define game variables
 scroll_left = False
@@ -43,7 +49,7 @@ rows = 18
 max_cols = 140
 # Want tile size to be 48 to match game
 tile_size = window_height // rows
-tile_types = 41
+tile_types = 39
 selected_tile = 0
 level = 0
 
@@ -69,29 +75,20 @@ for col in range(max_cols):
 
 default_level_data = level_data
 
+
 def draw_text(text, font, text_colour, x, y):
     img = font.render(text, True, text_colour)
     screen.blit(img, (x, y))
 
 
-# Loads an image from the given path
-def load_image(path, scale, alpha):
-    if alpha:
-        img = pygame.image.load(f"{path}").convert_alpha()
-    else:
-        img = pygame.image.load(f"{path}").convert()
-
-    img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
-    return img
-
-
 # Scale = 4
 # Load images, bg = 384x216
-bg1 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-1.png", scale, True)
-bg2 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-2.png", scale, True)
-bg3 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-3.png", scale, True)
-bg4 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-4.png", scale, True)
-bg5 = load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-5.png", scale, True)
+bg1 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-1.png", scale, True)
+bg2 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-2.png", scale, True)
+bg3 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-3.png", scale, True)
+bg4 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-4.png", scale, True)
+bg5 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-5.png", scale, True)
+
 
 img_list = []
 for i in range(tile_types):
@@ -99,22 +96,31 @@ for i in range(tile_types):
     img = pygame.transform.scale(img, (tile_size, tile_size))
     img_list.append(img)
 
+# Load images after tile types as buttons that have a special purpose
+special_btn_imgs = []
+tile_dir = "pygame_images/game1/tiles"
+num_files = len([name for name in os.listdir(tile_dir) if os.path.isfile(os.path.join(tile_dir, name))])
+for i in range(tile_types, num_files):
+    img = pygame.image.load(f"pygame_images/game1/tiles/{i}.png").convert_alpha()
+    img = pygame.transform.scale(img, (tile_size, tile_size))
+    special_btn_imgs.append(img)
+
+
 # Create special buttons
-restart_btn = button.Button(808, window_height + 40, img_list[35], 1)
-load_btn = button.Button(324 * 2, window_height + 40, img_list[36], 1)
-save_btn = button.Button(808 + 0.5 * 808, window_height + 40, img_list[37], 1)
-up_level_btn = button.Button(250, window_height + 40, img_list[38], 1)
-down_level_btn = button.Button(350, window_height + 40, img_list[39], 1)
-close_btn = button.Button(980, 392, img_list[40], 1)
+restart_btn = button.Button(808, window_height + 40, 1, special_btn_imgs[0])
+load_btn = button.Button(324 * 2, window_height + 40, 1, special_btn_imgs[1])
+save_btn = button.Button(808 + 0.5 * 808, window_height + 40, 1, special_btn_imgs[2])
+up_level_btn = button.Button(250, window_height + 40, 1, special_btn_imgs[3])
+down_level_btn = button.Button(350, window_height + 40, 1, special_btn_imgs[4])
+close_btn = button.Button(980, 392, 1, special_btn_imgs[5])
 
 # Make a button list
 button_list = []
 btn_col = 0
 btn_row = 0
 
-# Ignores last 6 tiles (special buttons)
-for i in range(len(img_list) - 6):
-    btn = button.Button(window_width + (btn_col * 70) + 50, btn_row * 70 + 50, img_list[i], 1)
+for i in range(len(img_list)):
+    btn = button.Button(window_width + (btn_col * 70) + 50, btn_row * 70 + 50, 1, img_list[i])
     button_list.append(btn)
     btn_col += 1
 
@@ -126,7 +132,7 @@ for i in range(len(img_list) - 6):
 def draw_bg():
     screen.fill(green)
     width = bg1.get_width()
-
+    # Bg img is repeatedly blit i times across level
     for i in range(4):
         # Different multipliers give parallax background effect
         screen.blit(bg1, ((i * width) - scroll * 0.4, 0))
@@ -150,17 +156,8 @@ def draw_level():
     # row is the individual list, y refers to which row
     for row_idx, row, in enumerate(level_data):
         for col_idx, tile in enumerate(row):
-            if tile != -1:
+            if tile >= 0:
                 screen.blit(img_list[tile], ((col_idx * tile_size - scroll), row_idx * tile_size))
-
-
-def load_level(csv_file_name):
-    with open(csv_file_name, "r", newline='') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        # Reader returns many lists (rows) of strings
-        for row_idx, row in enumerate(csv_reader):
-            for col_idx, tile in enumerate(row):
-                level_data[row_idx][col_idx] = int(tile)
 
 
 running = True
@@ -181,13 +178,13 @@ while running:
             displaying_error = False
 
     if restart_btn.draw(screen):
-        load_level("default_level.csv")
+        level_data = util.load_level("default_level.csv", level_data)
 
     elif up_level_btn.draw(screen):
         scroll = 0
         try:
             level += 1
-            load_level(f"level{level}_data.csv")
+            level_data = util.load_level(f"level{level}_data.csv", level_data)
         except FileNotFoundError:
             displaying_error = True
 
@@ -195,7 +192,7 @@ while running:
         scroll = 0
         try:
             level -= 1
-            load_level(f"level{level}_data.csv")
+            level_data = util.load_level(f"level{level}_data.csv", level_data)
         except FileNotFoundError:
             displaying_error = True
 
@@ -221,6 +218,7 @@ while running:
     # Check mouse coordinates are within level grid
     if pos[0] < window_width and pos[1] < window_height:
         # Update tile value
+        # May need to add check so that the user can only have 1 player tile on the level at all times
         if pygame.mouse.get_pressed()[0]:
             level_data[level_y][level_x] = selected_tile
 

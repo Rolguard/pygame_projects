@@ -2,11 +2,13 @@ import pygame
 import spritesheet
 import os
 import random
+import util
+import button
 
 pygame.init()
 
 window_width = 1280
-window_height = int((window_width / 16) * 9)
+window_height = 864
 
 screen = pygame.display.set_mode((window_width, window_height))
 pygame.display.set_caption("Scroller")
@@ -24,15 +26,30 @@ black2 = (60, 60, 60)
 red = (255, 75, 50)
 green = (100, 255, 50)
 white = (255, 255, 255)
+tangerine = (241, 143, 1)
 
 # Define font
 press_start_font = pygame.font.Font("pygame_images/game1/fonts/PressStart2P-vaV7.ttf", 18)
 determination_font = pygame.font.Font("pygame_images/game1/fonts/DeterminationSansWebRegular-369X.ttf", 32)
 
 # Define game variables
+start_game = False
 gravity = 0.65
 terminal_velocity = 9
-tile_size = 50
+level = 0
+rows = 18
+max_cols = 140
+
+tile_size = window_height // rows
+tile_types = 39
+
+# Scroll starts when player moves left or right from centre of screen, assumes player rect size = 1 tile
+scroll_start_point = (window_width // 2) - tile_size
+# Scrolling of tiles based on velocity of player movement
+screen_scroll = 0
+# How far scrolled from start screen
+bg_scroll = 0
+
 
 # Defining player action variables
 moving_left = False
@@ -43,36 +60,22 @@ lightning = False
 # (player cannot hold button for lightning)
 lightning_casted = False
 
-
-# Loads an image from the given path
-def load_image(path, scale, alpha):
-    if alpha:
-        img = pygame.image.load(f"{path}").convert_alpha()
-    else:
-        img = pygame.image.load(f"{path}").convert()
-
-    img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
-    return img
-
-
-# Loads multiple images from files in folder_path into a list
-# Images must be numbered from 0, e.g. 0.png, 1.png
-def load_image_list(folder_path, scale, num_images):
-    images = []
-    if os.path.exists(folder_path):
-        for i in range(num_images):
-            file_path = f"{folder_path}/{i}.png"
-            img = load_image(file_path, scale, True)
-            images.append(img)
-
-    return images
-
-
 # Define images
-background_img = load_image("pygame_images/21009917.png", 1, False)
-lightning_drop_img = load_image("pygame_images/game1/drops/lightning_bolt.png", 2, True)
-heart_img1 = load_image("pygame_images/game1/drops/heart1.png", 2, True)
-heart_img2 = load_image("pygame_images/game1/drops/heart2.png", 2, True)
+bg1 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-1.png", 4, True)
+bg2 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-2.png", 4, True)
+bg3 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-3.png", 4, True)
+bg4 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-4.png", 4, True)
+bg5 = util.load_image("pygame_images/game1/Jungle Asset Pack/parallax background/plx-5.png", 4, True)
+lightning_drop_img = util.load_image("pygame_images/game1/drops/lightning_bolt.png", 2, True)
+heart_img1 = util.load_image("pygame_images/game1/drops/heart1.png", 2, True)
+heart_img2 = util.load_image("pygame_images/game1/drops/heart2.png", 2, True)
+
+tile_list = util.load_image_list("pygame_images/game1/tiles", 3, tile_types)
+# 1280 x 864
+mm_bg1 = util.load_image("pygame_images/game1/parallax_mountain_pack/parallax_mountain_pack/layers/"
+                         "parallax-mountain-bg.png", 5, True)
+
+# start_btn_img =
 
 # Drops
 item_drops = {
@@ -81,8 +84,8 @@ item_drops = {
     # Can add coins later
 }
 # Parsing regular images in a folder
-wraith_proj_frames = load_image_list("pygame_images/game1/Mini Fires 2/2", 2,
-                                     len(os.listdir("pygame_images/game1/Mini Fires 2/2")))
+wraith_proj_frames = util.load_image_list("pygame_images/game1/Mini Fires 2/2", 2,
+                                          len(os.listdir("pygame_images/game1/Mini Fires 2/2")))
 
 # Parsing sprite sheet
 fireball_sprite_sheet = spritesheet.SpriteSheet(pygame.image.load("pygame_images/game1/flames/flame_horizontal.png"))
@@ -101,7 +104,13 @@ def draw_text(text, font, text_colour, x, y):
 
 def draw_bg():
     screen.fill(bg_colour)
-    pygame.draw.line(screen, red, (0, 650), (window_width, 650))
+    width = bg1.get_width()
+    for i in range(4):
+        screen.blit(bg1, ((i * width) - bg_scroll * 0.4, 0))
+        screen.blit(bg2, ((i * width) - bg_scroll * 0.5, 0))
+        screen.blit(bg3, ((i * width) - bg_scroll * 0.6, 0))
+        screen.blit(bg4, ((i * width) - bg_scroll * 0.7, 0))
+        screen.blit(bg5, ((i * width) - bg_scroll * 0.8, 0))
 
 
 class Character(pygame.sprite.Sprite):
@@ -138,7 +147,7 @@ class Character(pygame.sprite.Sprite):
         self.vision = pygame.Rect(0, 0, 300, 30)
 
         # Load all images for the character
-        animation_types = ["Idle", "Run", "Jump", "Death"]
+        animation_types = ["Idle", "Run", "Jump", "Death", "Attack"]
         for animation in animation_types:
             # Reset temporary list of images
             temp_list = []
@@ -147,7 +156,7 @@ class Character(pygame.sprite.Sprite):
             if os.path.exists(animation_path):
                 # Count number of files in folder
                 num_frames = len(os.listdir(animation_path))
-                temp_list = load_image_list(animation_path, scale, num_frames).copy()
+                temp_list = util.load_image_list(animation_path, scale, num_frames).copy()
 
             # If character does not have an animation_type e.g. "Jump", will append an empty list since path must exist
             # In order for frames to be loaded
@@ -159,9 +168,13 @@ class Character(pygame.sprite.Sprite):
         # Access the multiple animation sequences (lists) within animation_list
         # Check if images are actually being loaded
         self.char_img = self.animation_list[self.action][self.frame_index]
+        # Need pos_float since pygame.rect will truncate floats e.g. 11 + 1.8 = 12.8 --> 12
+        # If you add or subtract floats
         self.pos_float = [x, y]
         self.rect = self.char_img.get_rect()
         self.rect.center = (x, y)
+        self.width = self.char_img.get_width()
+        self.height = self.char_img.get_height()
 
     def update(self):
         self.update_animation()
@@ -171,9 +184,9 @@ class Character(pygame.sprite.Sprite):
             self.shooting_cooldown -= 1
 
     def move(self, moving_left, moving_right):
+        scroll = 0
         dx = 0
         dy = 0
-
         # Assign movement variables if moving_left or moving_right is True
         if moving_left:
             dx = -self.velocity_x
@@ -185,7 +198,7 @@ class Character(pygame.sprite.Sprite):
             self.direction = 1
 
         if self.jump and not self.in_air:
-            # Consider adding feature where the longer the player holds jump, the higher they jump
+            # TODO: Consider adding feature where the longer the player holds jump, the higher they jump
             # E.g. Short-tap = short jump, Holding = max jump
             # More responsive gameplay
             self.velocity_y = -20
@@ -199,20 +212,51 @@ class Character(pygame.sprite.Sprite):
 
         dy += self.velocity_y
 
-        # Check if collision will occur with floor
-        if self.rect.bottom + dy > 650:
-            dy = 650 - self.rect.bottom
-            self.in_air = False
+        # Collisions are checked before the character is moved
+        for tile in world.obstacle_list:
+            # Check if movement will cause collision with tile in the x direction
+            if tile[1].colliderect(self.pos_float[0] + dx, self.pos_float[1], self.width, self.height):
+                dx = 0
 
+            # Checks if movement will cause collision with tile in the y direction
+            if tile[1].colliderect(self.pos_float[0], self.pos_float[1] + dy, self.width, self.height):
+                if self.velocity_y < 0:
+                    # Character is moving upwards, collides with bottom of rect
+                    # Change in y so only character just touch the rect and not any further
+                    self.velocity_y = 0
+                    dy = tile[1].bottom - self.rect.top
+
+                elif self.velocity_y >= 0:
+                    # Character is falling down, collides with top of rect
+                    self.velocity_y = 0
+                    self.in_air = False
+                    dy = tile[1].top - self.rect.bottom
+
+        if self.char_type == "wizard":
+            if self.rect.left + dx < 0 or self.rect.right + dx > window_width:
+                dx = 0
         # Update rect position using movement variables
-
-        # Need pos_float since pygame.rect will truncate floats e.g. 11 + 1.8 = 12.8 --> 12
-        # If you add or subtract floats
+        # Need pos_float since pygame.rect will truncate floats if you add or subtract floats
+        # e.g. 11 + 1.8 = 12.8 --> 12
+        # pos_float for precise location of character in decimals
 
         self.pos_float[0] += dx
         self.pos_float[1] += dy
         self.rect.x = self.pos_float[0]
         self.rect.y = self.pos_float[1]
+
+        # Update scroll based on player position and amount scrolled from starting screen
+        if self.char_type == "wizard" and self.alive:
+            world_length = world.level_col * tile_size - window_width
+
+            if (self.rect.right > window_width - scroll_start_point and bg_scroll < world_length) \
+                    or (self.rect.left < scroll_start_point and bg_scroll > abs(dx)):
+                # Must make player still first, then make objects scroll
+                self.pos_float[0] -= dx
+                self.rect.x = self.pos_float[0]
+                scroll = -dx
+
+        return scroll
 
     def shoot(self, proj_frames, proj_group):
         if self.shooting_cooldown == 0:
@@ -220,12 +264,13 @@ class Character(pygame.sprite.Sprite):
                 self.shooting_cooldown = 50
             else:
                 self.shooting_cooldown = 15
-            # Reminder to lower range of player projectiles - currently just go to end of screen
+
             proj = Projectile(self.rect.centerx + (1.1 * self.rect.size[0] * self.direction),
                               self.rect.centery, self.direction, proj_frames)
             proj_group.add(proj)
 
     def ai(self):
+        # TODO: Need to differentiate ai mechanics for wraith and skeleton
         if self.alive and player.alive:
             if not self.idle and random.randint(1, 100) == 1:
                 self.idle = True
@@ -236,8 +281,9 @@ class Character(pygame.sprite.Sprite):
             if self.vision.colliderect(player.rect):
                 # Idle then shoot player
                 # print("Wraith sees player")
-                self.update_action(0)
-                self.shoot(wraith_proj_frames, wraith_proj_group)
+                if self.char_type == "wraith":
+                    self.update_action(0)
+                    self.shoot(wraith_proj_frames, wraith_proj_group)
             else:
                 if not self.idle:
                     if self.direction == 1:
@@ -259,6 +305,9 @@ class Character(pygame.sprite.Sprite):
                     if self.idle_counter <= 0:
                         self.idle = False
 
+        self.pos_float[0] += screen_scroll
+        self.rect.x = self.pos_float[0]
+
     def update_animation(self):
         # Create timer for next frame in animation
         animation_cooldown = 120
@@ -273,10 +322,10 @@ class Character(pygame.sprite.Sprite):
 
         # Reset frame_index if it has reached end of animation sequence
         if self.frame_index >= len(self.animation_list[self.action]):
-            # Check for jump animation
+            # Prevent reset to starting frame for jump animation
             if self.action == 2:
                 self.frame_index = len(self.animation_list[self.action]) - 1
-            # Check for death animation
+            # Prevent reset to starting frame for death animation
             elif self.action == 3:
                 self.frame_index = len(self.animation_list[self.action]) - 1
 
@@ -322,11 +371,12 @@ class ItemDrop(pygame.sprite.Sprite):
         self.image = item_drops[self.item_type]
         self.rect = self.image.get_rect()
         # midtop means middle of rect's x and top of rect's y
-        # Top middle of rect positioned such that it is half-way between a tile and just above the top of the tile
+        # Top middle of rect positioned such that it is horizontally half-way between a tile
+        # and positioned just above the top of the tile
         self.rect.midtop = (x + tile_size // 2, y + (tile_size - self.image.get_height()))
-        # self.rect.center = (x, y)
 
     def update(self):
+        self.rect.x += screen_scroll
         # Check if the player has collided with the drop
         if pygame.sprite.collide_rect(self, player):
             # Player has picked up drop
@@ -359,18 +409,20 @@ class Projectile(pygame.sprite.Sprite):
 
     def update(self):
         # Move projectile
-        self.rect.x += self.direction * self.velocity_x
+        self.rect.x += self.direction * self.velocity_x + screen_scroll
 
         # Check if bullet has gone off screen
         if self.rect.right < 0 or self.rect.left > window_width:
             # self.kill is method from sprite group class, removes sprite from all groups
             self.kill()
-
-        # Check projectile collision with alive characters
-        if pygame.sprite.spritecollide(player, fireball_group, False):
-            if player.alive:
-                player.health -= 5
+        # Check for collision with tiles in level
+        for tile in world.obstacle_list:
+            if tile[1].colliderect(self.rect):
                 self.kill()
+
+        if pygame.sprite.spritecollide(player, wraith_proj_group, False):
+            player.health -= 5
+            self.kill()
 
         # Check projectile collision for all types of enemies
         for enemy in enemy_group:
@@ -381,9 +433,6 @@ class Projectile(pygame.sprite.Sprite):
                     explosion_group.add(explosion)
                     enemy.health -= 10
                     self.kill()
-            elif pygame.sprite.spritecollide(player, wraith_proj_group, False):
-                player.health -= 5
-                self.kill()
 
         self.update_animation()
         self.draw()
@@ -425,6 +474,7 @@ class Explosion(pygame.sprite.Sprite):
         self.rect.center = (x, y)
 
     def update(self):
+        self.rect.x += screen_scroll
         # Update explosion animation
         animation_cooldown = 80
 
@@ -450,98 +500,182 @@ class Explosion(pygame.sprite.Sprite):
                     enemy.health -= 10
 
 
+class World:
+    def __init__(self, level_data):
+        self.obstacle_list = []
+        self.level_data = level_data
+        self.level_col = len(self.level_data[0])
+
+    def process_data(self):
+        for row_idx, row in enumerate(self.level_data):
+            for col_idx, tile in enumerate(row):
+                if tile >= 0:
+                    # Tile is not empty
+                    img = tile_list[tile]
+                    tile_rect = img.get_rect()
+                    tile_rect.x = col_idx * tile_size
+                    tile_rect.y = row_idx * tile_size
+
+                    tile_data = (img, tile_rect)
+                    if tile < 31:
+                        self.obstacle_list.append(tile_data)
+                    elif tile == 31:
+                        # Create skeleton
+                        new_skeleton = Character("skeleton", col_idx * tile_size, row_idx * tile_size, 2, 3, 150, 0)
+                        enemy_group.add(new_skeleton)
+                    elif tile == 32:
+                        # Create wraith
+                        # If player runs into wraith they die instantly
+                        new_wraith = Character("wraith", col_idx * tile_size, row_idx * tile_size, 3, 1.7, 50, 0)
+                        enemy_group.add(new_wraith)
+                    elif tile == 33:
+                        # Create health drops
+                        new_health_drop = ItemDrop("health", col_idx * tile_size, row_idx * tile_size)
+                        item_drop_group.add(new_health_drop)
+                    elif tile == 34:
+                        # Create lightning charge drops
+                        new_lightning_drop = ItemDrop("lightning", col_idx * tile_size, row_idx * tile_size)
+                        item_drop_group.add(new_lightning_drop)
+                    elif tile == 35:
+                        # Create player
+                        new_player = Character("wizard", col_idx * tile_size, row_idx * tile_size, 3, 4, 100, 4)
+                    elif tile == 36:
+                        # Create spikes
+                        spikes = Spikes(img, col_idx * tile_size, row_idx * tile_size)
+                        spikes_group.add(spikes)
+                    elif tile == 37 or 38:
+                        # Decoration (trees)
+                        decoration = Decoration(img, col_idx * tile_size, row_idx * tile_size)
+                        decoration_group.add(decoration)
+
+        return new_player
+
+    def draw(self):
+        # tile[0] = img, tile[1] = tile_rect
+        for tile in self.obstacle_list:
+            tile[1].x += screen_scroll
+            screen.blit(tile[0], tile[1])
+
+
+class Spikes(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = img
+        self.rect = self.image.get_rect()
+        # Top middle of rect positioned such that it is horizontally half-way between a tile
+        # and positioned just above the top of the tile
+        self.rect.midtop = (x + tile_size // 2, y + (tile_size - self.image.get_height()))
+
+    def update(self):
+        self.rect.x += screen_scroll
+
+
+class Decoration(pygame.sprite.Sprite):
+    def __init__(self, img, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = img
+        self.rect = self.image.get_rect()
+        self.rect.midtop = (x + tile_size // 2, y + (1.2 * tile_size - self.image.get_height()))
+
+    def update(self):
+        self.rect.x += screen_scroll
+
+
 # Create sprite groups (sprite group = list containing sprites, can call 1 method for all sprites in a group)
 fireball_group = pygame.sprite.Group()
 explosion_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
 item_drop_group = pygame.sprite.Group()
 wraith_proj_group = pygame.sprite.Group()
+spikes_group = pygame.sprite.Group()
+decoration_group = pygame.sprite.Group()
 
-# Create item_drop
-lightning_drop = ItemDrop("lightning", 200, 600)
-item_drop_group.add(lightning_drop)
+# List containing rows (list) of tiles (-1 = nothing)
+level_data = []
+for row in range(rows):
+    r = [-1] * max_cols
+    level_data.append(r)
 
-health_drop = ItemDrop("health", 500, 600)
-item_drop_group.add(health_drop)
+new_level_data = util.load_level(f'level{level}_data.csv', level_data)
+world = World(new_level_data)
+player = world.process_data()
 
-# Create instance of player
-# player variable has access to any of the attributes initialised by the constructor
-player = Character("wizard", 300, 300, 3, 4, 100, 4)
-print(player.char_img.get_width())
-# health_bar = HealthBar(10, 10, player.health, player.max_health)
-
-wraith = Character("wraith", 600, 600, 3, 1.7, 50, 0)
-wraith2 = Character("wraith", 700, 600, 3, 1.7, 50, 0)
-wraith3 = Character("wraith", 580, 600, 3, 1.7, 50, 0)
-wraith4 = Character("wraith", 1000, 600, 3, 1.7, 50, 0)
-enemy_group.add(wraith)
-enemy_group.add(wraith2)
-enemy_group.add(wraith3)
-enemy_group.add(wraith4)
+# When the game is in and not in main menu, change window resolutions
 
 while running:
     clock.tick(FPS)
-    draw_bg()
+    if not start_game:
+        # In main menu
+        screen.fill(bg_colour)
+        screen.blit(mm_bg1, (0, 0))
+        draw_text("Start", determination_font, tangerine, window_width // 2, window_height // 2 + 200)
+    else:
+        draw_bg()
+        world.draw()
 
-    # Show player's max health then player's current health
-    draw_text("Health: ", determination_font, white, 10, 25)
-    for i in range(0, player.max_health, 10):
-        screen.blit(heart_img2, (115 + (i * 4), 25))
+        # Show player's max health then player's current health
+        draw_text("Health: ", determination_font, white, 10, 25)
+        for i in range(0, player.max_health, 10):
+            screen.blit(heart_img2, (115 + (i * 4), 25))
 
-    for i in range(0, player.health, 10):
-        screen.blit(heart_img1, (115 + (i * 4), 25))
+        for i in range(0, player.health, 10):
+            screen.blit(heart_img1, (115 + (i * 4), 25))
 
-    # Show lightning charges
-    draw_text("Lightning: ", determination_font, white, 10, 75)
-    for i in range(player.lightning_charges):
-        screen.blit(lightning_drop_img, (150 + (i * 40), 75))
-    player.update()
-    player.draw()
+        # Show lightning charges
+        draw_text("Lightning: ", determination_font, white, 10, 75)
+        for i in range(player.lightning_charges):
+            screen.blit(lightning_drop_img, (150 + (i * 40), 75))
+        player.update()
+        player.draw()
 
-    for enemy in enemy_group:
-        enemy.ai()
-        enemy.update()
-        enemy.draw()
+        for enemy in enemy_group:
+            enemy.update()
+            enemy.ai()
+            enemy.draw()
 
-    # Update and draw sprite groups
-    # Calls update() for all Projectiles (sprites) in the sprite group
-    # (Instance of Projectile created when shooting = True)
-    fireball_group.update()
-    explosion_group.update()
-    explosion_group.draw(screen)
-    wraith_proj_group.update()
-    wraith_proj_group.draw(screen)
-    item_drop_group.update()
-    item_drop_group.draw(screen)
+        # Update and draw sprite groups
+        # Calls update() for all Projectiles (sprites) in the sprite group
+        # (Instance of Projectile created when shooting = True)
+        decoration_group.update()
+        decoration_group.draw(screen)
+        fireball_group.update()
+        explosion_group.update()
+        explosion_group.draw(screen)
+        wraith_proj_group.update()
+        wraith_proj_group.draw(screen)
+        item_drop_group.update()
+        item_drop_group.draw(screen)
+        spikes_group.update()
+        spikes_group.draw(screen)
 
-    if player.alive:
-        # Check the state of the player and update player actions
-        if shooting:
-            # Creates instance of Projectile class and adds to fireball_group (sprite.Group)
-            player.shoot(fireball_frames, fireball_group)
-            # Need to set up flip for fireballs
-        elif lightning and not lightning_casted and player.lightning_charges > 0:
-            # Can replace constant (6) with tile_size later, so range of lightning determined by tile length
-            lightning_x = player.rect.centerx + (6 * player.rect.size[0] * player.direction)
+        if player.alive:
+            # Check the state of the player and update player actions
+            if shooting:
+                # Creates instance of Projectile class and adds to fireball_group (sprite.Group)
+                player.shoot(fireball_frames, fireball_group)
+            elif lightning and not lightning_casted and player.lightning_charges > 0:
+                lightning_x = player.rect.centerx + (6 * tile_size * player.direction)
 
-            # Using -48 (16 x 3) to y because the lightning animation is 32x32 (scale 5), and player is 16x16 (scale 3)
-            lightning = Explosion(lightning_x,
-                                  player.rect.centery - 48, lightning_frames, "lightning", 2)
-            explosion_group.add(lightning)
+                # Using -48 (16 x 3) to y because the lightning animation is 32x32 (scale 5),
+                # And player is 16x16 (scale 3)
+                lightning = Explosion(lightning_x,
+                                      player.rect.centery - 48, lightning_frames, "lightning", 2)
+                explosion_group.add(lightning)
 
-            # Ensures player will not lose a lightning_charge if casted outside of the screen width
-            if not (lightning_x < 0 or lightning_x > window_width):
-                player.lightning_charges -= 1
-            lightning_casted = True
+                # Ensures player will not lose a lightning_charge if casted outside of the screen width
+                if not (lightning_x < 0 or lightning_x > window_width):
+                    player.lightning_charges -= 1
+                lightning_casted = True
 
-        if player.in_air:
-            player.update_action(2)  # 2: jump
-            # Need jump animation to stay on the 5th frame till it reaches the ground
-        elif moving_left or moving_right:
-            player.update_action(1)  # 1: run
-        else:
-            player.update_action(0)  # 0: idle
-        player.move(moving_left, moving_right)
+            if player.in_air:
+                player.update_action(2)  # 2: jump
+            elif moving_left or moving_right:
+                player.update_action(1)  # 1: run
+            else:
+                player.update_action(0)  # 0: idle
+
+            screen_scroll = player.move(moving_left, moving_right)
+            bg_scroll -= screen_scroll
 
     # Event handler
     for event in pygame.event.get():
